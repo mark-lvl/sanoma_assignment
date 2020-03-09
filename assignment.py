@@ -3,6 +3,7 @@ from datetime import (
 import calendar
 import requests
 from pathlib import Path
+import argparse
 import pandas as pd
 from utils.logger import log
 
@@ -50,6 +51,7 @@ def read_from_disk(filename: str) -> pd.DataFrame:
         return pd.read_csv(input_path)
     except Exception as ex:
         log.error(f'Faild on reading file in {input_path}, {ex}')
+        log.error(f'Run task_1 first...')
         exit()
 
 
@@ -72,20 +74,19 @@ def call_api(date: datetime, train_number: int = 5) -> pd.DataFrame:
         log.error(f'Faild on calling api on {date}, {ex}')
 
 
-def calc_avg_arrival_time(input_filename: str) -> str:
+def calc_avg_arrival_time(dataframe: pd.DataFrame) -> str:
     """
     Read collected data from disk and return and calculate the average
     actual arrival time at the final destination of the train during the
     month January 2020.
     """
-    df = read_from_disk(input_filename)
-    last_stops = df.groupby('departureDate')['scheduledTime'].max()
+    last_stops = dataframe.groupby('departureDate')['scheduledTime'].max()
     actualtimes = []
     # extract arrival timess on final destinations
     for index, value in last_stops.items():
-        actualtime = df[
-            (df['departureDate'] == index) &
-            (df['scheduledTime'] == value)]['actualTime'].values[0]
+        actualtime = dataframe[
+            (dataframe['departureDate'] == index) &
+            (dataframe['scheduledTime'] == value)]['actualTime'].values[0]
         actualtimes.append((actualtime.split('T')[1]).split('.')[0])
     # calculate the avg arrival time
     avg = str(timedelta(
@@ -96,10 +97,25 @@ def calc_avg_arrival_time(input_filename: str) -> str:
 
 
 if __name__ == '__main__':
-    log.info('Collecting the data started.')
-    days_records = []
-    for day_date in return_date_range(DATE_RANGE['year'], DATE_RANGE['month']):
-        days_records.append(call_api(day_date))
-
-    whole_month_records = pd.concat(days_records)
-    save_to_disk(whole_month_records, OUTPUT_FILENAME)
+    parser = argparse.ArgumentParser(
+        description='Sanoma assigement Task selector, \
+        either pick task_1 or task_2')
+    parser.add_argument(
+        "-t",
+        "--task",
+        help="Select the task you want to run",
+        choices=['task_1', 'task_2'],
+        required=True)
+    args = parser.parse_args()
+    if (args.task == 'task_1'):
+        log.info('Collecting the data started.')
+        days_records = []
+        for day_date in return_date_range(DATE_RANGE['year'],
+                                          DATE_RANGE['month']):
+            days_records.append(call_api(day_date))
+        whole_month_records = pd.concat(days_records)
+        save_to_disk(whole_month_records, OUTPUT_FILENAME)
+    elif (args.task == 'task_2'):
+        df = read_from_disk(OUTPUT_FILENAME)
+        avg_time = calc_avg_arrival_time(df)
+        print(f'Average actual arrival time: {avg_time}')
